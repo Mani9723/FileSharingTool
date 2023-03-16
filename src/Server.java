@@ -125,9 +125,7 @@ public class Server
 				}
 				size -= bytes;
 			}
-
-			System.out.print("\b\b\b");
-			System.out.print("...100% \n");
+			System.out.print("\b\b\b" + "...100% \n");
 			System.out.println("File is Received");
 		}
 		if(fileOutputStream != null) {
