@@ -1,6 +1,4 @@
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.Socket;
 import java.util.Arrays;
 
@@ -210,8 +208,9 @@ public class Client
 	{
 		if(len == 3){
 			//upload file to the server
-			sendToServer(conformCmd(args));
+			sendFileToServer(args);
 			//TODO Finish upload
+			System.out.println("After sending");
 			flush();
 		}else{
 			System.out.println(UPLOAD_CMD);
@@ -234,6 +233,31 @@ public class Client
 			flush();
 			System.exit(0);
 		}
+	}
+
+	private void sendFileToServer(String[] cmd) throws IOException
+	{
+		int bytes = 0;
+		File file = new File(cmd[1]);
+		FileInputStream fileInputStream = null;
+		if(file.isFile()){
+			fileInputStream = new FileInputStream(file);
+			dataOutputStream = new DataOutputStream(socket.getOutputStream());
+			dataOutputStream.writeUTF(conformCmd(cmd));
+			dataOutputStream.writeLong(file.length());
+
+			byte[] buffer = new byte[4*1024];
+			System.out.println("Sending File: " + file.getPath());
+			while ((bytes = fileInputStream.read(buffer)) != -1){
+				System.out.print("..");
+				dataOutputStream.write(buffer,0,bytes);
+				dataOutputStream.flush();
+			}
+			fileInputStream.close();
+		}else{
+			System.err.println(cmd[1] + " is not a file");
+		}
+
 	}
 
 	/**
