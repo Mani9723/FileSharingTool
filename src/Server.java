@@ -92,27 +92,34 @@ public class Server
 	// TODO Finish upload
 	private void upload(String dest) throws IOException
 	{
-		int bytes = 0;
+		int bytes = 0, progress, uploadedSoFar = 0;
 		long resumeUploadFrom = 0;
+		boolean resumingUpload = false, passedResumePoint = false;
 		FileOutputStream fileOutputStream = null;
 		File file = new File(dest);
-		boolean result = file.createNewFile();
-		if(!result){
+		if(file.createNewFile()){
 			resumeUploadFrom = file.length();
+			resumingUpload = true;
 		}
 		long size = dataInputStream.readLong();
-		if(resumeUploadFrom < size){
-			fileOutputStream = new FileOutputStream(dest, true);
-		}else {
-			fileOutputStream = new FileOutputStream(dest);
-		}
 		long fixedSize = size;
-		int progress;
+		fileOutputStream = new FileOutputStream(dest, resumingUpload);
 		byte[] buffer = new byte[4 * 1024];
 		System.out.print("Uploading File...");
-		while (size > 0 && (bytes = dataInputStream.read(buffer, 0, (int) Math.min(buffer.length, size)))
-				!= -1) {
+		while (size > 0 && (bytes = dataInputStream.read(buffer, 0, (int) Math.min(buffer.length, size))) != -1) {
+			uploadedSoFar += buffer.length;
+			if(resumingUpload && !passedResumePoint && (uploadedSoFar > resumeUploadFrom)){
+				int startIndex = (int)resumeUploadFrom > 4096 ? (int)(resumeUploadFrom-4096) : (int)resumeUploadFrom;
+				buffer = Arrays.copyOfRange(buffer, startIndex,4096);
+				bytes = buffer.length;
+				passedResumePoint = true;
+			}
+			if(resumingUpload && !passedResumePoint){
+				resumingUpload = false;
+				continue;
+			}
 			fileOutputStream.write(buffer, 0, bytes);
+			if(passedResumePoint) buffer = new byte[4 * 1024];
 			progress = (100 - (int)((double)(size) / fixedSize * 100));
 			if (progress < 100) {
 				System.out.print(progress + "%" + (progress < 10 ? "\b\b" : "\b\b\b"));
@@ -121,7 +128,6 @@ public class Server
 		}
 		System.out.print("\b\b\b" + "...100% \n");
 		System.out.println("File is Received");
-//		dataOutputStream.writeUTF("done");
 		fileOutputStream.close();
 	}
 
