@@ -66,7 +66,7 @@ public class Server
 				shutdown();
 				break;
 			case "upload":
-				upload(args[1], args[2]);
+				upload(args[2]);
 				break;
 			case "download":
 				download(args[1], args[2]);
@@ -86,51 +86,53 @@ public class Server
 		}
 	}
 
+	private boolean getFile(String file)
+	{
+		File destFile = new File(file);
+		if(!destFile.exists()) {
+			try {
+				if(!destFile.createNewFile()){
+					System.err.println("Error creating file: " + file);
+					return false;
+				}
+			} catch (IOException | SecurityException e) {
+				System.out.println(e.getMessage() + ": " + file);
+			}
+		}
+		return true;
+	}
 	/**
 	 * Uploads a file from client to the server
 	 */
 	// TODO Finish upload
-	private void upload(String source, String dest) throws IOException
+	private void upload(String dest) throws IOException
 	{
 		int bytes = 0;
-		File destFile = new File(dest);
-		if(!destFile.exists()) {
-			try {
-				destFile.createNewFile();
-			} catch (IOException | SecurityException e) {
-				System.out.println(e.getMessage() + ": " + dest);
+		FileOutputStream fileOutputStream = null;
+		if(getFile(dest)) {
+			fileOutputStream = new FileOutputStream(dest);
+			long size = dataInputStream.readLong();
+			long fixedSize = size;
+			int progress;
+			byte[] buffer = new byte[4 * 1024];
+			System.out.print("Uploading File...");
+			while (size > 0 && (bytes = dataInputStream.read(buffer, 0, (int) Math.min(buffer.length, size)))
+					!= -1) {
+				fileOutputStream.write(buffer, 0, bytes);
+				progress = (100 - (int) ((double) (size) / fixedSize * 100));
+				if (progress < 100) {
+					System.out.print(progress + "%" + (progress < 10 ? "\b\b" : "\b\b\b"));
+				}
+				size -= bytes;
 			}
+
+			System.out.print("\b\b\b");
+			System.out.print("...100% \n");
+			System.out.println("File is Received");
 		}
-
-		FileOutputStream fileOutputStream
-				= new FileOutputStream(dest);
-
-		long size = dataInputStream.readLong(); // read file size
-		long fixedSize = size;
-		byte[] buffer = new byte[4 * 1024];
-		int prevProg = 0;
-		System.out.print("Uploading File...");
-		while (size > 0 && (bytes = dataInputStream.read(buffer, 0,
-				(int) Math.min(buffer.length, size)))
-				!= -1) {
-			// Here we1 write the file using write method
-			fileOutputStream.write(buffer, 0, bytes);
-			int progress = (100 - (int)((double)(size)/fixedSize * 100));
-			if(progress < 100) {
-				System.out.print(progress +"%");
-				if(progress < 10)
-					System.out.print("\b\b");
-				else
-					System.out.print("\b\b\b");
-			}
-			size -= bytes; // read upto file size
+		if(fileOutputStream != null) {
+			fileOutputStream.close();
 		}
-		// Here we received file
-		System.out.print("\b\b\b");
-		System.out.print("...100% \n");
-		System.out.println("File is Received");
-		fileOutputStream.close();
-
 	}
 
 
@@ -223,7 +225,6 @@ public class Server
 
 	/**
 	 * Runs the main program
-	 * @throws IOException is network error
 	 */
 	private void run()
 	{
