@@ -20,8 +20,8 @@ public class Client
 	private final static String SHUTDOWN_CMD = "java -cp pa1.jar client shutdown";
 
 	private static Socket socket;
-	private DataOutputStream dataOutputStream;
-	private DataInputStream dataInputStream;
+	private static DataOutputStream dataOutputStream;
+	private static DataInputStream dataInputStream;
 
 
 	public Client(String[] args)

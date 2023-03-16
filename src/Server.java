@@ -13,7 +13,7 @@ import java.util.Arrays;
  */
 
 /**
- * TODO: UPLOAD(), DOWNLOAD()
+ * TODO: UPLOAD(handle resuming uploads), DOWNLOAD(), handle Exceptions for File method calls
  */
 public class Server
 {
@@ -86,21 +86,6 @@ public class Server
 		}
 	}
 
-	private boolean getFile(String file)
-	{
-		File destFile = new File(file);
-		if(!destFile.exists()) {
-			try {
-				if(!destFile.createNewFile()){
-					System.err.println("Error creating file: " + file);
-					return false;
-				}
-			} catch (IOException | SecurityException e) {
-				System.out.println(e.getMessage() + ": " + file);
-			}
-		}
-		return true;
-	}
 	/**
 	 * Uploads a file from client to the server
 	 */
@@ -108,29 +93,36 @@ public class Server
 	private void upload(String dest) throws IOException
 	{
 		int bytes = 0;
+		long resumeUploadFrom = 0;
 		FileOutputStream fileOutputStream = null;
-		if(getFile(dest)) {
+		File file = new File(dest);
+		boolean result = file.createNewFile();
+		if(!result){
+			resumeUploadFrom = file.length();
+		}
+		long size = dataInputStream.readLong();
+		if(resumeUploadFrom < size){
+			fileOutputStream = new FileOutputStream(dest, true);
+		}else {
 			fileOutputStream = new FileOutputStream(dest);
-			long size = dataInputStream.readLong();
-			long fixedSize = size;
-			int progress;
-			byte[] buffer = new byte[4 * 1024];
-			System.out.print("Uploading File...");
-			while (size > 0 && (bytes = dataInputStream.read(buffer, 0, (int) Math.min(buffer.length, size)))
-					!= -1) {
-				fileOutputStream.write(buffer, 0, bytes);
-				progress = (100 - (int) ((double) (size) / fixedSize * 100));
-				if (progress < 100) {
-					System.out.print(progress + "%" + (progress < 10 ? "\b\b" : "\b\b\b"));
-				}
-				size -= bytes;
+		}
+		long fixedSize = size;
+		int progress;
+		byte[] buffer = new byte[4 * 1024];
+		System.out.print("Uploading File...");
+		while (size > 0 && (bytes = dataInputStream.read(buffer, 0, (int) Math.min(buffer.length, size)))
+				!= -1) {
+			fileOutputStream.write(buffer, 0, bytes);
+			progress = (100 - (int)((double)(size) / fixedSize * 100));
+			if (progress < 100) {
+				System.out.print(progress + "%" + (progress < 10 ? "\b\b" : "\b\b\b"));
 			}
-			System.out.print("\b\b\b" + "...100% \n");
-			System.out.println("File is Received");
+			size -= bytes;
 		}
-		if(fileOutputStream != null) {
-			fileOutputStream.close();
-		}
+		System.out.print("\b\b\b" + "...100% \n");
+		System.out.println("File is Received");
+//		dataOutputStream.writeUTF("done");
+		fileOutputStream.close();
 	}
 
 
@@ -157,7 +149,12 @@ public class Server
 		System.out.println("Creating a directory at: " + directory.getPath());
 		if(!directory.isDirectory() && !directory.isFile()) {
 			System.out.println("Going to create it");
-			boolean result = directory.mkdirs();
+			boolean result = false;
+			try{
+				result = directory.mkdirs();
+			}catch (SecurityException e){
+				System.out.println(e.getMessage() + " at: " + path);
+			}
 			System.out.println("Created: " + result);
 			dataOutputStream.writeUTF(Boolean.toString(result));
 		}
@@ -185,7 +182,12 @@ public class Server
 	{
 		File file = new File(path);
 		if(!file.isDirectory() && file.exists()){
-			boolean result = file.delete();
+			boolean result = false;
+			try{
+				result = file.delete();
+			}catch (SecurityException e){
+				System.out.println(e.getMessage() + " at: " + path);
+			}
 			dataOutputStream.writeUTF(Boolean.toString(result));
 		}
 	}
@@ -197,7 +199,12 @@ public class Server
 	{
 		File directory = new File(path);
 		if(directory.isDirectory() && !directory.isFile()){
-			boolean result = directory.delete();
+			boolean result = false;
+			try {
+				result = directory.delete();
+			}catch (SecurityException e){
+				System.out.println(e.getMessage() + " at: " + path);
+			}
 			dataOutputStream.writeUTF(Boolean.toString(result));
 		}
 	}
@@ -215,6 +222,7 @@ public class Server
 				serverSocket.close();
 				socket.close();
 				System.out.println("Closed everything");
+				System.exit(0);
 			}
 		}catch (IOException e){
 			e.printStackTrace();
@@ -231,12 +239,10 @@ public class Server
 				String command = dataInputStream.readUTF();
 				System.out.println("User command: " + command);
 				processCommand(command);
-				break;
+//				break;
 			}
 		}catch (IOException e){
-			System.out.println("Connection was terminated by Client");
-		}finally {
-			shutdown();
+			System.out.println("Connection: "+port + " was closed. Waiting for next...");
 		}
 	}
 
