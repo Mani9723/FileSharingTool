@@ -23,6 +23,8 @@ public class Server
 	private static DataOutputStream dataOutputStream;
 	private static int port;
 
+	private final static int BUFFER_SIZE = 4096;
+
 	public Server(int portNum)
 	{
 		port = portNum;
@@ -67,8 +69,6 @@ public class Server
 				break;
 			case "upload":
 				upload(args[2]);
-				System.out.print("\b\b\b" + "...100% \n");
-				System.out.println("File is Received");
 				break;
 			case "download":
 				download(args[1], args[2]);
@@ -95,21 +95,19 @@ public class Server
 	{
 		int bytes = 0;
 		long resumeUploadFrom = 0, uploadedSoFar = 0;
-		boolean resumingUpload = false, reachedUploadPoint = false;
-		FileOutputStream fileOutputStream = null;
-		File file = new File(dest);
+		boolean resumingUpload = false, reachedUploadPoint = false, readNextBuffer = false;;
 		long size = dataInputStream.readLong();
 		long fixedSize = size;
-		int progress = -1;
-		byte[] buffer = new byte[4 * 1024];
+		byte[] buffer = new byte[BUFFER_SIZE];
+
+		FileOutputStream fileOutputStream;
+		File file = new File(dest);
 		boolean result = file.createNewFile();
 		if(!result && file.length() < size) {
 			resumingUpload = true;
 			resumeUploadFrom = file.length();
 		}
 		fileOutputStream = new FileOutputStream(dest, resumingUpload);
-		System.out.print("Uploading File...");
-		boolean readNextBuffer = false;
 		while (size > 0 && (bytes = dataInputStream.read(buffer, 0, (int) Math.min(buffer.length, size)))
 				!= -1) {
 			while(resumingUpload && !reachedUploadPoint){
@@ -128,16 +126,13 @@ public class Server
 				reachedUploadPoint = false;
 				resumingUpload = false;
 				int startIndexBuffer = getStartIndexBuffer(resumeUploadFrom, uploadedSoFar);
-				buffer = Arrays.copyOfRange(buffer,startIndexBuffer,4096);
-				bytes = size <= 4096 ? ((int)size-startIndexBuffer) :buffer.length;
+				buffer = Arrays.copyOfRange(buffer,startIndexBuffer,BUFFER_SIZE);
+				bytes = size <= BUFFER_SIZE ? ((int)size-startIndexBuffer) :buffer.length;
 			}
-
 			fileOutputStream.write(buffer, 0, bytes);
 			size -= 4096;
-			progress = (100 - (int)((double)(size)/fixedSize * 100));
-			if (progress < 100) {
-				System.out.print(progress + "%" + (progress < 10 ? "\b\b" : "\b\b\b"));
-			}
+			dataOutputStream.writeInt(100 - (int)((double)(size)/fixedSize * 100));
+			dataOutputStream.flush();
 
 			if(buffer.length != 4096) buffer = new byte[4*1024];
 		}

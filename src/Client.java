@@ -248,15 +248,22 @@ public class Client
 			dataOutputStream.writeLong(file.length());
 
 			byte[] buffer = new byte[4*1024];
-			System.out.println("Sending File: " + file.getPath());
+//			System.out.println("Sending File: " + file.getPath());
+			System.out.print("Uploading File...");
 			while ((bytes = fileInputStream.read(buffer)) != -1){
 				dataOutputStream.write(buffer,0,bytes);
 				dataOutputStream.flush();
+				int progress = dataInputStream.readInt();
+				if (progress < 100) {
+					System.out.print(progress + "%" + (progress < 10 ? "\b\b" : "\b\b\b"));
+				}
 			}
 			String msg = null;
 			while(msg == null){
 				msg = dataInputStream.readUTF();
 			}
+			System.out.print("\b\b\b" + "...100% \n");
+			System.out.println("File Uploaded");
 			fileInputStream.close();
 		}else{
 			System.err.println(cmd[1] + " is not a file");
