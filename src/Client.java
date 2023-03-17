@@ -243,15 +243,19 @@ public class Client
 		if(file.isFile()){
 			fileInputStream = new FileInputStream(file);
 			dataOutputStream = new DataOutputStream(socket.getOutputStream());
+			dataInputStream = new DataInputStream(socket.getInputStream());
 			dataOutputStream.writeUTF(conformCmd(cmd));
 			dataOutputStream.writeLong(file.length());
 
 			byte[] buffer = new byte[4*1024];
 			System.out.println("Sending File: " + file.getPath());
 			while ((bytes = fileInputStream.read(buffer)) != -1){
-				System.out.print("..");
 				dataOutputStream.write(buffer,0,bytes);
 				dataOutputStream.flush();
+			}
+			String msg = null;
+			while(msg == null){
+				msg = dataInputStream.readUTF();
 			}
 			fileInputStream.close();
 		}else{

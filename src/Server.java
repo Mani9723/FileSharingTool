@@ -67,6 +67,8 @@ public class Server
 				break;
 			case "upload":
 				upload(args[2]);
+				System.out.print("\b\b\b" + "...100% \n");
+				System.out.println("File is Received");
 				break;
 			case "download":
 				download(args[1], args[2]);
@@ -89,46 +91,78 @@ public class Server
 	/**
 	 * Uploads a file from client to the server
 	 */
-	// TODO Finish upload
 	private void upload(String dest) throws IOException
 	{
-		int bytes = 0, progress, uploadedSoFar = 0;
-		long resumeUploadFrom = 0;
-		boolean resumingUpload = false, passedResumePoint = false;
+		int bytes = 0;
+		long resumeUploadFrom = 0, uploadedSoFar = 0;
+		boolean resumingUpload = false, reachedUploadPoint = false;
 		FileOutputStream fileOutputStream = null;
 		File file = new File(dest);
-		if(file.createNewFile()){
-			resumeUploadFrom = file.length();
-			resumingUpload = true;
-		}
 		long size = dataInputStream.readLong();
 		long fixedSize = size;
-		fileOutputStream = new FileOutputStream(dest, resumingUpload);
+		int progress = -1;
 		byte[] buffer = new byte[4 * 1024];
+		boolean result = file.createNewFile();
+		if(!result && file.length() < size) {
+			resumingUpload = true;
+			resumeUploadFrom = file.length();
+		}
+		fileOutputStream = new FileOutputStream(dest, resumingUpload);
 		System.out.print("Uploading File...");
-		while (size > 0 && (bytes = dataInputStream.read(buffer, 0, (int) Math.min(buffer.length, size))) != -1) {
-			uploadedSoFar += buffer.length;
-			if(resumingUpload && !passedResumePoint && (uploadedSoFar > resumeUploadFrom)){
-				int startIndex = (int)resumeUploadFrom > 4096 ? (int)(resumeUploadFrom-4096) : (int)resumeUploadFrom;
-				buffer = Arrays.copyOfRange(buffer, startIndex,4096);
-				bytes = buffer.length;
-				passedResumePoint = true;
+		boolean readNextBuffer = false;
+		while (size > 0 && (bytes = dataInputStream.read(buffer, 0, (int) Math.min(buffer.length, size)))
+				!= -1) {
+			while(resumingUpload && !reachedUploadPoint){
+				uploadedSoFar += bytes;
+				if(uploadedSoFar > resumeUploadFrom){
+					reachedUploadPoint = true;
+					readNextBuffer = false;
+				}else {
+					size -= bytes;
+					readNextBuffer = true;
+					break;
+				}
 			}
-			if(resumingUpload && !passedResumePoint){
+			if(readNextBuffer) continue;
+			if(reachedUploadPoint){
+				reachedUploadPoint = false;
 				resumingUpload = false;
-				continue;
+				int startIndexBuffer = getStartIndexBuffer(resumeUploadFrom, uploadedSoFar);
+				buffer = Arrays.copyOfRange(buffer,startIndexBuffer,4096);
+				bytes = size <= 4096 ? ((int)size-startIndexBuffer) :buffer.length;
 			}
+
 			fileOutputStream.write(buffer, 0, bytes);
-			if(passedResumePoint) buffer = new byte[4 * 1024];
-			progress = (100 - (int)((double)(size) / fixedSize * 100));
+			size -= 4096;
+			progress = (100 - (int)((double)(size)/fixedSize * 100));
 			if (progress < 100) {
 				System.out.print(progress + "%" + (progress < 10 ? "\b\b" : "\b\b\b"));
 			}
-			size -= bytes;
+
+			if(buffer.length != 4096) buffer = new byte[4*1024];
 		}
-		System.out.print("\b\b\b" + "...100% \n");
-		System.out.println("File is Received");
+		dataOutputStream.writeUTF("Done");
 		fileOutputStream.close();
+	}
+
+	/**
+	 * Calculates the normalized buffer for the data
+	 * @param resumeUploadFrom - Current file size of the interrupted upload
+	 * @param uploadedSoFar - Skipping these bytes as they have been uploaded
+	 * @return - Start index of the buffer
+	 */
+	private int getStartIndexBuffer(long resumeUploadFrom, long uploadedSoFar)
+	{
+		int startIndexBuffer = 0;
+		if(resumeUploadFrom < 4096){
+			startIndexBuffer = (int) resumeUploadFrom;
+		}else{
+			startIndexBuffer = (int)(resumeUploadFrom - 4096);
+			if(startIndexBuffer > 4096){
+				startIndexBuffer = 4096 - (int)(uploadedSoFar - resumeUploadFrom);
+			}
+		}
+		return startIndexBuffer;
 	}
 
 
@@ -248,7 +282,7 @@ public class Server
 //				break;
 			}
 		}catch (IOException e){
-			System.out.println("Connection: "+port + " was closed. Waiting for next...");
+			System.out.println("Connection was terminated by Client");
 		}
 	}
 
