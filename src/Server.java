@@ -94,11 +94,11 @@ public class Server
 	private void upload(String dest) throws IOException
 	{
 		int bytes = 0;
-		long resumeUploadFrom = 0, uploadedSoFar = 0;
-		boolean resumingUpload = false, reachedUploadPoint = false, readNextBuffer = false;;
 		long size = dataInputStream.readLong();
+		long resumeUploadFrom = 0, uploadedSoFar = 0;
 		long fixedSize = size;
 		byte[] buffer = new byte[BUFFER_SIZE];
+		boolean resumingUpload = false, reachedUploadPoint = false, readNextBuffer = false;;
 
 		FileOutputStream fileOutputStream;
 		File file = new File(dest);

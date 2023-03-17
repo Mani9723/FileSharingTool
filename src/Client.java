@@ -248,7 +248,6 @@ public class Client
 			dataOutputStream.writeLong(file.length());
 
 			byte[] buffer = new byte[4*1024];
-//			System.out.println("Sending File: " + file.getPath());
 			System.out.print("Uploading File...");
 			while ((bytes = fileInputStream.read(buffer)) != -1){
 				dataOutputStream.write(buffer,0,bytes);
