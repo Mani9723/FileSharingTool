@@ -2,6 +2,7 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Arrays;
+import java.util.Objects;
 
 /**
  * Server class for Programming Assignment 1
@@ -13,7 +14,7 @@ import java.util.Arrays;
  */
 
 /**
- * TODO: UPLOAD(handle resuming uploads), DOWNLOAD(), handle Exceptions for File method calls
+ * TODO: DOWNLOAD(), handle Exceptions for File method calls
  */
 public class Server
 {
@@ -38,15 +39,13 @@ public class Server
 	/**
 	 * Initializes the server and streams
 	 *
-	 * @return True is server started
+	 * @return True if server started
 	 */
 	private boolean startServer()
 	{
 		try {
 			serverSocket = new ServerSocket(port);
-			System.out.println("Started server at: " + serverSocket.getLocalPort());
 			socket = serverSocket.accept();
-			System.out.println("Client socket has been accepted: " + socket.isConnected());
 			dataOutputStream = new DataOutputStream(socket.getOutputStream());
 			dataInputStream = new DataInputStream(socket.getInputStream());
 		} catch (IOException e) {
@@ -60,7 +59,7 @@ public class Server
 	 *
 	 * @param command String commands
 	 */
-	private void processCommand(String command) throws IOException
+	private String processCommand(String command) throws IOException
 	{
 		String[] args = command.trim().split(" ");
 		switch (args[0]) {
@@ -85,11 +84,19 @@ public class Server
 			case "rm":
 				rm(args[1]);
 				break;
+			default:
+				System.out.println("Invalid Command");
+				return null;
 		}
+		return args[0];
 	}
 
 	/**
 	 * Uploads a file from client to the server
+	 * It can resume a previous upload if it was interrupted.
+	 * If the file already exists in its entirety then it replaces the file
+	 *
+	 * @param dest Destination on the server
 	 */
 	private void upload(String dest) throws IOException
 	{
@@ -164,7 +171,7 @@ public class Server
 	/**
 	 * Send a file from the server to the client
 	 */
-	// TODO Finish Download
+	// TODO Finish Download, should be reverse of the the upload flow
 	private void download(String source, String dest)
 	{
 		File sourceFile = new File(source);
@@ -257,7 +264,6 @@ public class Server
 				serverSocket.close();
 				socket.close();
 				System.out.println("Closed everything");
-				System.exit(0);
 			}
 		}catch (IOException e){
 			e.printStackTrace();
@@ -270,12 +276,13 @@ public class Server
 	private void run()
 	{
 		try {
-			while (true) {
+			String cmd = "running";
+			while (!Objects.requireNonNull(cmd).equalsIgnoreCase("shutdown")) {
 				String command = dataInputStream.readUTF();
 				System.out.println("User command: " + command);
-				processCommand(command);
-//				break;
+				cmd = processCommand(command);
 			}
+			System.exit(0);
 		}catch (IOException e){
 			System.out.println("Connection was terminated by Client");
 		}

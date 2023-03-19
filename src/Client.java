@@ -18,6 +18,7 @@ public class Client
 	private final static String RMDIR_CMD = "java -cp pa1.jar client rmdir </path/existing_directory/on/server>";
 	private final static String RM_CMD = "java -cp pa1.jar client rm </path/existing_filename/on/server>";
 	private final static String SHUTDOWN_CMD = "java -cp pa1.jar client shutdown";
+	private final static int BUFFER_SIZE = 4*1024;
 
 	private static Socket socket;
 	private static DataOutputStream dataOutputStream;
@@ -247,7 +248,7 @@ public class Client
 			dataOutputStream.writeUTF(conformCmd(cmd));
 			dataOutputStream.writeLong(file.length());
 
-			byte[] buffer = new byte[4*1024];
+			byte[] buffer = new byte[BUFFER_SIZE];
 			System.out.print("Uploading File...");
 			while ((bytes = fileInputStream.read(buffer)) != -1){
 				dataOutputStream.write(buffer,0,bytes);
@@ -300,7 +301,7 @@ public class Client
 			System.out.println("java Client <action> <path> <path>");
 			System.exit(-1);
 		}else{
-			Client client = new Client(args);
+			new Client(args);
 		}
 	}
 }
