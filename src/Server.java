@@ -2,7 +2,6 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Arrays;
-import java.util.Objects;
 
 /**
  * Server class for Programming Assignment 1
@@ -67,10 +66,10 @@ public class Server
 				shutdown();
 				break;
 			case "upload":
-				upload(args[2]);
+				uploadToServer(args[2]);
 				break;
 			case "download":
-				download(args[1], args[2]);
+				downloadToClient(args[1]);
 				break;
 			case "dir":
 				dir(args[1]);
@@ -86,7 +85,7 @@ public class Server
 				break;
 			default:
 				System.out.println("Invalid Command");
-				return null;
+				return "stopped";
 		}
 		return args[0];
 	}
@@ -98,7 +97,7 @@ public class Server
 	 *
 	 * @param dest Destination on the server
 	 */
-	private void upload(String dest) throws IOException
+	private void uploadToServer(String dest) throws IOException
 	{
 		int bytes = 0;
 		long size = dataInputStream.readLong();
@@ -172,15 +171,33 @@ public class Server
 	 * Send a file from the server to the client
 	 */
 	// TODO Finish Download, should be reverse of the the upload flow
-	private void download(String source, String dest)
+	private void downloadToClient(String source) throws IOException
 	{
-		File sourceFile = new File(source);
-		File destFile = new File(dest);
+		int bytes = 0;
+		File file = new File(source);
+		FileInputStream fileInputStream = null;
+		if(file.isFile()){
+			fileInputStream = new FileInputStream(file);
+			dataOutputStream.writeLong(file.length()); // send file length to client
+			byte[] buffer = new byte[BUFFER_SIZE];
+			System.out.print("Sending file to client File...");
+			while ((bytes = fileInputStream.read(buffer)) != -1){
+				dataOutputStream.write(buffer,0,bytes);
+				dataOutputStream.flush();
+			}
+			String msg = null;
+			while(msg == null){
+				msg = dataInputStream.readUTF();
+			}
+			fileInputStream.close();
+		}else{
+			System.err.println(source + " is not a file");
+		}
 
 	}
 
 	/**
-	 * Creates a new directory in the server if it
+	 * Creates a new directory in the server if and only if it
 	 * does not exist before
 	 * @param path Directory path
 	 * @throws IOException Network issues
@@ -208,12 +225,16 @@ public class Server
 	private void dir(String path) throws IOException
 	{
 		File dirPath = new File(path);
+		System.out.println("at dir method");
 		if(dirPath.isDirectory() && !dirPath.isFile()) {
 			File[] dirList = dirPath.listFiles();
+			System.out.println(dirList.length);
 			dataOutputStream.writeUTF(Arrays.toString(dirList)
 					.replace("[","")
 					.replace("]","")
 					.replace(",","\n"));
+		}else{
+			dataOutputStream.writeUTF("Error at path: " + dirPath);
 		}
 	}
 
@@ -277,7 +298,7 @@ public class Server
 	{
 		try {
 			String cmd = "running";
-			while (!Objects.requireNonNull(cmd).equalsIgnoreCase("shutdown")) {
+			while (!cmd.equalsIgnoreCase("shutdown")) {
 				String command = dataInputStream.readUTF();
 				System.out.println("User command: " + command);
 				cmd = processCommand(command);

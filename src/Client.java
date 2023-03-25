@@ -171,9 +171,11 @@ public class Client
 		if(len == 2){
 			// print contents of server directory
 			sendToServer(conformCmd(args));
-			String filesList = dataInputStream.readUTF();
-			if(!filesList.isEmpty()) {
-				System.out.println(filesList);
+			System.out.println("after sending command");
+			String response = dataInputStream.readUTF();
+			System.out.println(response);
+			if(!response.isEmpty()) {
+				System.out.println(response);
 			}else{
 				System.out.println("Empty Directory");
 			}
@@ -192,12 +194,93 @@ public class Client
 	{
 		if(len == 3) {
 			// download file from the server
-			sendToServer(conformCmd(args));
+			File pathOnClient = new File(args[2]);
+			if(pathOnClient.isDirectory() && !pathOnClient.isFile()) {
+				sendToServer(conformCmd(args));
+				receiveFileFromServer(pathOnClient);
+			}else{
+				System.err.println("Destination a not directory: "+args[2]);
+			}
+
 			//TODO finish download
 			flush();
 		}else{
 			System.out.println(DOWNLD_CMD);
 		}
+	}
+
+	private void receiveFileFromServer(File dest) throws IOException
+	{
+		int bytes = 0;
+		long size = dataInputStream.readLong();
+		long resumeUploadFrom = 0, uploadedSoFar = 0;
+		long fixedSize = size;
+		byte[] buffer = new byte[BUFFER_SIZE];
+		boolean resumingUpload = false, reachedUploadPoint = false, readNextBuffer = false;;
+
+		FileOutputStream fileOutputStream;
+		boolean result = dest.createNewFile();
+		if(!result && dest.length() < size) {
+			resumingUpload = true;
+			resumeUploadFrom = dest.length();
+		}
+		fileOutputStream = new FileOutputStream(dest, resumingUpload);
+		System.out.print("Downloading File...");
+		while (size > 0 && (bytes = dataInputStream.read(buffer, 0, (int) Math.min(buffer.length, size)))
+				!= -1) {
+			while(resumingUpload && !reachedUploadPoint){
+				uploadedSoFar += bytes;
+				if(uploadedSoFar > resumeUploadFrom){
+					reachedUploadPoint = true;
+					readNextBuffer = false;
+				}else {
+					size -= bytes;
+					readNextBuffer = true;
+					break;
+				}
+			}
+			if(readNextBuffer) continue;
+			if(reachedUploadPoint){
+				reachedUploadPoint = false;
+				resumingUpload = false;
+				int startIndexBuffer = getStartIndexBuffer(resumeUploadFrom, uploadedSoFar);
+				buffer = Arrays.copyOfRange(buffer,startIndexBuffer,BUFFER_SIZE);
+				bytes = size <= BUFFER_SIZE ? ((int)size-startIndexBuffer) :buffer.length;
+			}
+			fileOutputStream.write(buffer, 0, bytes);
+			size -= 4096;
+			int progress = 100 - (int)((double)(size)/fixedSize * 100);
+			if (progress < 100) {
+				System.out.print(progress + "%" + (progress < 10 ? "\b\b" : "\b\b\b"));
+			}
+			dataOutputStream.flush();
+
+			if(buffer.length != 4096) buffer = new byte[4*1024];
+		}
+		System.out.print("\b\b\b" + "...100% \n");
+		System.out.println("File Downloaded");
+		dataOutputStream.writeUTF("Done");
+		fileOutputStream.close();
+	}
+
+	/**
+	 * Calculates the normalized buffer for the data
+	 * @param resumeUploadFrom - Current file size of the interrupted upload
+	 * @param uploadedSoFar - Skipping these bytes as they have been uploaded
+	 * @return - Start index of the buffer
+	 */
+	private int getStartIndexBuffer(long resumeUploadFrom, long uploadedSoFar)
+	{
+		int startIndexBuffer = 0;
+		if(resumeUploadFrom < 4096){
+			startIndexBuffer = (int) resumeUploadFrom;
+		}else{
+			startIndexBuffer = (int)(resumeUploadFrom - 4096);
+			if(startIndexBuffer > 4096){
+				startIndexBuffer = 4096 - (int)(uploadedSoFar - resumeUploadFrom);
+			}
+		}
+		return startIndexBuffer;
 	}
 
 	/**
@@ -210,7 +293,6 @@ public class Client
 		if(len == 3){
 			//upload file to the server
 			sendFileToServer(args);
-			//TODO Finish upload
 			System.out.println("After sending");
 			flush();
 		}else{
@@ -279,7 +361,6 @@ public class Client
 		System.out.println("Creating a socket at port: " + socket.getLocalPort());
 		dataInputStream = new DataInputStream(socket.getInputStream());
 		dataOutputStream = new DataOutputStream(socket.getOutputStream());
-
 		dataOutputStream.writeUTF(cmd);
 
 	}
