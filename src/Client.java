@@ -195,13 +195,12 @@ public class Client
 		if(len == 3) {
 			// download file from the server
 			File pathOnClient = new File(args[2]);
-			if(pathOnClient.isDirectory() && !pathOnClient.isFile()) {
+			if(!pathOnClient.isDirectory()) {
 				sendToServer(conformCmd(args));
 				receiveFileFromServer(pathOnClient);
 			}else{
-				System.err.println("Destination a not directory: "+args[2]);
+				System.err.println("Destination is a directory: "+args[2]);
 			}
-
 			//TODO finish download
 			flush();
 		}else{
